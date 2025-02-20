@@ -21,7 +21,6 @@ import Link from 'next/link'
 export default function Header() {
   const [currentUser, setCurrentUser] = useRecoilState(userState)
   const router = useRouter()
-  const auth = getAuth()
 
   const { resolvedTheme, theme, setTheme } = useTheme()
   const [switchState, setSwitchState] = useState()
@@ -32,10 +31,12 @@ export default function Header() {
 
   useEffect(() => {
     console.log('%cHeader rendered', 'color:orange')
-    onAuthStateChanged(auth, user => {
+
+    const auth = getAuth()  // Moved inside the useEffect to avoid repeated calls
+    const unsubscribe = onAuthStateChanged(auth, user => {
       if (user) {
         const fetchUser = async () => {
-          const docRef = doc(db, 'users', user.auth.currentUser.providerData[0].uid)
+          const docRef = doc(db, 'users', user.uid) // You don't need to use `user.auth.currentUser.providerData[0].uid`
           const docSnap = await getDoc(docRef)
           if (docSnap.exists()) {
             setCurrentUser(docSnap.data())
@@ -45,6 +46,10 @@ export default function Header() {
       }
     })
 
+    // Cleanup on unmount
+    return () => unsubscribe()
+
+    // Adjust theme based on localStorage or resolvedTheme
     if (localStorage.theme === 'dark' || resolvedTheme === 'dark') {
       setSwitchState(true)
     } else if (localStorage.theme === 'light' || resolvedTheme === 'light') {
@@ -67,6 +72,7 @@ export default function Header() {
   }
 
   const onSignOut = () => {
+    const auth = getAuth()  // Initialize auth here as well
     signOut(auth)
     setCurrentUser(null)
     router.reload()
@@ -102,9 +108,10 @@ export default function Header() {
   ]
 
   const displayPopup = () => setPopupVisible(curr => !curr)
+
   async function onGoogleClick() {
     try {
-      const auth = getAuth()
+      const auth = getAuth() // Reinitialize auth here as well
       const provider = new GoogleAuthProvider()
       await signInWithPopup(auth, provider)
       const user = auth.currentUser.providerData[0]
@@ -125,6 +132,7 @@ export default function Header() {
       console.log(error)
     }
   }
+
   return (
     <div className="max-w-screen-2xl xl:mx-auto px-5">
       <div className="flex items-center justify-between ">
@@ -187,8 +195,6 @@ export default function Header() {
                 <div className="text-center">
                   <Image
                     src={`${resolvedTheme === 'dark' ? '/fitness tracker logo white.svg' : '/fitness tracker logo.svg'}`}
-                    // layout="fill"
-                    className=""
                     width={200}
                     height={50}
                   />
@@ -202,13 +208,6 @@ export default function Header() {
                   <i className="pi pi-google px-2"></i>
                   <span className="px-3">Google</span>
                 </Button>
-                {/* <Button
-                  className="facebook p-0 w-full flex justify-center"
-                  aria-label="Facebook"
-                >
-                  <i className="pi pi-facebook px-2"></i>
-                  <span className="px-3">Facebook</span>
-                </Button> */}
               </Dialog>
             </>
           )}
